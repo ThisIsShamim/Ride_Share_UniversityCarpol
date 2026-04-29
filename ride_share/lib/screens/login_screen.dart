@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../widgets/ride_share_logo.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -12,7 +14,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    signInOption: SignInOption.standard,
+    scopes: ['email', 'profile'],
+  );
   bool _isPasswordVisible = false;
 
   void _showMessage(String message) {
@@ -23,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signInWithGoogle() async {
     try {
+      // Sign out first to ensure account picker is shown
+      await _googleSignIn.signOut();
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         _showMessage('Google sign-in cancelled.');
@@ -40,6 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _showMessage(
         'Signed in successfully as ${FirebaseAuth.instance.currentUser?.displayName ?? 'Google user'}',
       );
+
+      // Navigate to Home Screen
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } on FirebaseAuthException catch (e) {
       _showMessage(e.message ?? 'Google sign-in failed.');
     } catch (e) {
@@ -65,6 +78,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _showMessage(
           'Signed in successfully as ${FirebaseAuth.instance.currentUser?.email}.',
         );
+
+        // Navigate to Home Screen
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       } on FirebaseAuthException catch (e) {
         _showMessage(e.message ?? 'Login failed.');
       } catch (e) {
@@ -109,18 +127,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Logo and App Name
                 Column(
                   children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Color(0xFF2563EB),
-                        size: 30,
-                      ),
+                    const RideShareLogo(
+                      size: 80,
+                      primaryColor: Color(0xFF2563EB),
+                      accentColor: Colors.white,
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -363,24 +373,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       // Sign Up Link
                       Center(
-                        child: RichText(
-                          text: TextSpan(
-                            text: "Don't have an account? ",
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Sign Up →',
-                                style: const TextStyle(
-                                  color: Color(0xFF2563EB),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                                recognizer: null, // TODO: Add tap gesture
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const SignupScreen(),
                               ),
-                            ],
+                            );
+                          },
+                          child: RichText(
+                            text: const TextSpan(
+                              text: "Don't have an account? ",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Sign Up →',
+                                  style: TextStyle(
+                                    color: Color(0xFF2563EB),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

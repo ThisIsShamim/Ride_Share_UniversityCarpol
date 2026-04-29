@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../widgets/ride_share_logo.dart';
 
 // Professional color scheme
 const Color primaryColor = Color(0xFF0066CC);
@@ -19,6 +22,24 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _originController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
   String? _selectedDate;
+
+  Future<void> _logout() async {
+    try {
+      // Sign out from Google
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+
+      // Sign out from Firebase
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+    }
+  }
 
   @override
   void dispose() {
@@ -67,39 +88,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   AppBar _buildAppBar() {
+    final user = FirebaseAuth.instance.currentUser;
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.05),
       title: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [primaryColor, accentColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(Icons.directions_car, color: Colors.white, size: 24),
-            ),
+          const RideShareLogo(
+            size: 50,
+            primaryColor: primaryColor,
+            accentColor: accentColor,
           ),
           const SizedBox(width: 12),
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'RideShare',
                 style: TextStyle(
                   color: darkText,
@@ -109,12 +114,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                'University Carpool',
-                style: TextStyle(
+                user?.displayName ?? 'University Carpool',
+                style: const TextStyle(
                   color: lightText,
                   fontWeight: FontWeight.w400,
                   fontSize: 11,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -127,9 +134,38 @@ class _HomeScreenState extends State<HomeScreen> {
             color: backgroundColor,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: IconButton(
+          child: PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'logout') {
+                _logout();
+              } else if (value == 'profile') {
+                // TODO: Navigate to profile screen
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 20),
+                    SizedBox(width: 8),
+                    Text('Profile'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Logout', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
             icon: const Icon(Icons.menu_rounded, color: darkText, size: 24),
-            onPressed: () {},
           ),
         ),
       ],
