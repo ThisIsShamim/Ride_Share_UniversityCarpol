@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -8,13 +10,76 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   bool _isPasswordVisible = false;
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _showMessage('Google sign-in cancelled.');
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      _showMessage(
+        'Signed in successfully as ${FirebaseAuth.instance.currentUser?.displayName ?? 'Google user'}',
+      );
+    } on FirebaseAuthException catch (e) {
+      _showMessage(e.message ?? 'Google sign-in failed.');
+    } catch (e) {
+      _showMessage('Google sign-in failed: $e');
+    }
+  }
+
+  Future<void> _signInWithEmailOrPhone() async {
+    final String identifier = _identifierController.text.trim();
+    final String password = _passwordController.text;
+
+    if (identifier.isEmpty || password.isEmpty) {
+      _showMessage('Please enter your email/phone and password.');
+      return;
+    }
+
+    if (identifier.contains('@')) {
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: identifier,
+          password: password,
+        );
+        _showMessage(
+          'Signed in successfully as ${FirebaseAuth.instance.currentUser?.email}.',
+        );
+      } on FirebaseAuthException catch (e) {
+        _showMessage(e.message ?? 'Login failed.');
+      } catch (e) {
+        _showMessage('Login failed: $e');
+      }
+    } else {
+      _showMessage(
+        'Phone login is not configured yet. Use email login or Google sign-in.',
+      );
+    }
+  }
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -106,9 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: 48,
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            // TODO: Implement Google Sign In
-                          },
+                          onPressed: _signInWithGoogle,
                           icon: Image.asset(
                             'assets/google_logo.png',
                             width: 20,
@@ -147,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'OR PHONE NUMBER',
+                              'OR EMAIL / PHONE',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -162,16 +225,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Phone Number Field
+                      // Email or Phone Field
                       TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
+                        controller: _identifierController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           prefixIcon: const Icon(
-                            Icons.phone_outlined,
+                            Icons.person_outline,
                             color: Colors.grey,
                           ),
-                          hintText: 'Phone number',
+                          hintText: 'Email or phone number',
                           hintStyle: const TextStyle(color: Colors.grey),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -260,9 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            // TODO: Implement Login functionality
-                          },
+                          onPressed: _signInWithEmailOrPhone,
                           icon: const Icon(Icons.login, size: 20),
                           label: const Text(
                             'Login',
