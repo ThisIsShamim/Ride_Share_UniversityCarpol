@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../widgets/ride_share_logo.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
