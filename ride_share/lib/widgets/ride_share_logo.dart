@@ -6,11 +6,11 @@ class RideShareLogo extends StatelessWidget {
   final Color? accentColor;
 
   const RideShareLogo({
-    Key? key,
+    super.key,
     this.size = 100,
     this.primaryColor,
     this.accentColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

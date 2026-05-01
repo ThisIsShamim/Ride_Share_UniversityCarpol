@@ -4,7 +4,7 @@ import '../widgets/ride_share_logo.dart';
 import 'signup_screen.dart';
 
 class LoginScreenUpdated extends StatefulWidget {
-  const LoginScreenUpdated({Key? key}) : super(key: key);
+  const LoginScreenUpdated({super.key});
 
   @override
   State<LoginScreenUpdated> createState() => _LoginScreenUpdatedState();

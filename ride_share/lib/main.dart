@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
+import 'screens/login_screen_converted_fixed.dart';
 import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -24,9 +24,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      home: const LoginScreenConvertedFixed(),
       routes: {
-        '/login': (context) => const LoginScreen(),
+        '/login': (context) => const LoginScreenConvertedFixed(),
         '/signup': (context) => const SignupScreen(),
         '/home': (context) => const HomeScreen(),
       },

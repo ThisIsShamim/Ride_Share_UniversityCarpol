@@ -1,14 +1,11 @@
+// home_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import '../widgets/ride_share_logo.dart';
 
-// Professional color scheme
-const Color primaryColor = Color(0xFF0066CC);
-const Color accentColor = Color(0xFF00B4D8);
-const Color darkText = Color(0xFF1A1A1A);
-const Color lightText = Color(0xFF666666);
-const Color backgroundColor = Color(0xFFF8FAFC);
+// Note: Uncomment and update these imports to match your actual project structure.
+// import '../components/ride_card.dart';
+// import '../components/booking_modal.dart';
+// import '../types.dart';
+// import '../mock_data.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,852 +15,712 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  // --- Search Inputs ---
   final TextEditingController _originController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
-  String? _selectedDate;
+  final TextEditingController _checkpointController = TextEditingController();
+  DateTime? _searchDate;
 
-  Future<void> _logout() async {
-    try {
-      // Sign out from Google
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut();
+  // --- Filters ---
+  String _vehicleType = 'all';
+  String _priceRange = 'all';
+  String _acFilter = 'all';
+  String _sortBy = 'time';
 
-      // Sign out from Firebase
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
-    }
+  // --- UI State ---
+  bool _showSearchPanel = false;
+  bool _showAdvanced = false;
+  final bool _bookingOpen = false;
+  // Ride? _selectedRide; // Uncomment when you have the Ride model imported
+
+  // Mocking the user and derived data since mockData isn't provided
+  // Replace these with your actual state management or derived data logic
+  final Map<String, dynamic> _currentUser = {'gender': 'female'};
+  final List<dynamic> _filteredRides = [];
+  final int _femaleOnlyCount = 2;
+
+  // --- Derived ---
+  int get _activeFilterCount {
+    int count = 0;
+    if (_vehicleType != 'all') count++;
+    if (_priceRange != 'all') count++;
+    if (_acFilter != 'all') count++;
+    if (_sortBy != 'time') count++;
+    if (_checkpointController.text.trim().isNotEmpty) count++;
+    return count;
+  }
+
+  void _clearAll() {
+    setState(() {
+      _originController.clear();
+      _destinationController.clear();
+      _checkpointController.clear();
+      _searchDate = null;
+      _vehicleType = 'all';
+      _priceRange = 'all';
+      _acFilter = 'all';
+      _sortBy = 'time';
+    });
   }
 
   @override
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
+    _checkpointController.dispose();
     super.dispose();
-  }
-
-  void _onBottomNavTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSafetyAlert(),
-                  const SizedBox(height: 32),
-                  _buildSearchForm(),
-                  const SizedBox(height: 40),
-                  _buildAvailableRidesSection(),
-                  const SizedBox(height: 16),
-                  _buildRidesList(),
-                  const SizedBox(height: 30),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavBar(),
-    );
-  }
-
-  AppBar _buildAppBar() {
-    final user = FirebaseAuth.instance.currentUser;
-    return AppBar(
       backgroundColor: Colors.white,
-      elevation: 1,
-      shadowColor: Colors.black.withValues(alpha: 0.05),
-      title: Row(
-        children: [
-          const RideShareLogo(
-            size: 50,
-            primaryColor: primaryColor,
-            accentColor: accentColor,
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'RideShare',
-                style: TextStyle(
-                  color: darkText,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 20,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              Text(
-                user?.displayName ?? 'University Carpool',
-                style: const TextStyle(
-                  color: lightText,
-                  fontWeight: FontWeight.w400,
-                  fontSize: 11,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ],
-      ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') {
-                _logout();
-              } else if (value == 'profile') {
-                // TODO: Navigate to profile screen
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem(
-                value: 'profile',
-                child: Row(
-                  children: [
-                    Icon(Icons.person, size: 20),
-                    SizedBox(width: 8),
-                    Text('Profile'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 20, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Logout', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-            icon: const Icon(Icons.menu_rounded, color: darkText, size: 24),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            primaryColor.withValues(alpha: 0.08),
-            accentColor.withValues(alpha: 0.04),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Find Your Ride',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: darkText,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Search available rides to your destination',
-            style: TextStyle(
-              fontSize: 15,
-              color: lightText,
-              fontWeight: FontWeight.w400,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSafetyAlert() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF5F7),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFCCE3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE91E63).withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE91E63).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.security_rounded,
-                color: Color(0xFFE91E63),
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'Female-only rides are marked with a shield icon',
-              style: TextStyle(
-                color: Color(0xFFB71C1C),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchForm() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSearchField(
-            label: 'From',
-            hint: 'Pickup location',
-            icon: Icons.location_on_rounded,
-            controller: _originController,
-          ),
-          const SizedBox(height: 20),
-          _buildSearchField(
-            label: 'To',
-            hint: 'Destination',
-            icon: Icons.location_on_rounded,
-            controller: _destinationController,
-          ),
-          const SizedBox(height: 20),
-          _buildDateField(),
-          const SizedBox(height: 24),
-          _buildSearchButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchField({
-    required String label,
-    required String hint,
-    required IconData icon,
-    required TextEditingController controller,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: darkText,
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(
-              color: Color(0xFFBDBDBD),
-              fontWeight: FontWeight.w400,
-            ),
-            prefixIcon: Icon(icon, color: primaryColor, size: 20),
-            filled: true,
-            fillColor: backgroundColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: primaryColor, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-          ),
-          style: const TextStyle(color: darkText, fontWeight: FontWeight.w500),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDateField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Date',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: darkText,
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () async {
-            final DateTime? picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime.now(),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: const ColorScheme.light(
-                      primary: primaryColor,
-                      onPrimary: Colors.white,
-                      surface: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 512), // max-w-lg
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── HEADER ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Find a Ride',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900, // font-black
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_filteredRides.length} ride${_filteredRides.length != 1 ? 's' : ''} available',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                        _buildFilterButton(),
+                      ],
                     ),
                   ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) {
-              setState(() {
-                _selectedDate =
-                    '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-              });
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      color: primaryColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _selectedDate ?? 'Select departure date',
-                      style: TextStyle(
-                        color: _selectedDate != null ? darkText : lightText,
-                        fontWeight: _selectedDate != null
-                            ? FontWeight.w500
-                            : FontWeight.w400,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
-                ),
-                const Icon(Icons.expand_more_rounded, color: lightText),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildSearchButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [primaryColor, accentColor],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withValues(alpha: 0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.search_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Search Rides',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvailableRidesSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Available Rides',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: darkText,
-                letterSpacing: -0.5,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              '6 rides found',
-              style: TextStyle(
-                fontSize: 13,
-                color: lightText,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-              ),
-            ],
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 18, color: primaryColor),
-              SizedBox(width: 6),
-              Text(
-                'Filter',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: primaryColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRidesList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      itemBuilder: (context, index) {
-        return _buildRideCard(index);
-      },
-    );
-  }
-
-  Widget _buildRideCard(int index) {
-    final driverNames = [
-      'Rabira Ahmad',
-      'Ali Khan',
-      'Sara Ahmed',
-      'Hassan Ali',
-      'Zara Khan',
-      'Omar Hassan',
-    ];
-    final origins = [
-      'Campus A',
-      'Campus B',
-      'Downtown',
-      'North Area',
-      'West Side',
-      'East Area',
-    ];
-    final destinations = [
-      'Downtown',
-      'Campus C',
-      'Airport',
-      'Mall',
-      'Hospital',
-      'Station',
-    ];
-    final prices = ['500', '450', '550', '480', '520', '490'];
-    final ratings = [4.8, 4.9, 4.7, 4.6, 4.8, 4.9];
-    final times = [
-      '10:30 AM',
-      '11:15 AM',
-      '02:45 PM',
-      '03:00 PM',
-      '04:30 PM',
-      '05:15 PM',
-    ];
-    final isFemaleOnly = index < 2;
-
-    final List<Color> avatarColors = [
-      const Color(0xFF1E90FF),
-      const Color(0xFF00B4D8),
-      const Color(0xFF00D4FF),
-      const Color(0xFF6C5CE7),
-      const Color(0xFFE84C3D),
-      const Color(0xFF00B894),
-    ];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Driver Avatar
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  avatarColors[index],
-                  avatarColors[index].withValues(alpha: 0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: avatarColors[index].withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                driverNames[index][0],
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 22,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Ride Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Driver name and female-only badge
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        driverNames[index],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: darkText,
-                        ),
-                      ),
-                    ),
-                    if (isFemaleOnly)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFEAF2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(
-                              0xFFE91E63,
-                            ).withValues(alpha: 0.3),
-                            width: 1,
+                  // ── GENDER SAFETY BANNER ──
+                  if (_currentUser['gender'] == 'female' &&
+                      _femaleOnlyCount > 0)
+                    _buildSafetyBanner(
+                      icon: Icons.security,
+                      iconColor: Colors.pink[500]!,
+                      bgColor: Colors.pink[50]!,
+                      borderColor: Colors.pink[100]!,
+                      content: RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.pink[700],
+                            height: 1.5,
                           ),
-                        ),
-                        child: const Row(
                           children: [
-                            Icon(
-                              Icons.security_rounded,
-                              color: Color(0xFFE91E63),
-                              size: 14,
+                            TextSpan(
+                              text: '$_femaleOnlyCount Female Only',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Women',
-                              style: TextStyle(
-                                color: Color(0xFFE91E63),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                            TextSpan(
+                              text:
+                                  ' ride${_femaleOnlyCount > 1 ? 's' : ''} available — exclusive safe rides just for you.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  if (_currentUser['gender'] == 'male' && _femaleOnlyCount > 0)
+                    _buildSafetyBanner(
+                      icon: Icons.error_outline,
+                      iconColor: Colors.grey[400]!,
+                      bgColor: Colors.grey[50]!,
+                      borderColor: Colors.grey[200]!,
+                      content: const Text(
+                        'Female Only rides are hidden from your results for safety.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+
+                  // ── SEARCH / FILTER PANEL ──
+                  if (_showSearchPanel) _buildSearchPanel(),
+
+                  // ── QUICK SORT CHIPS (always visible) ──
+                  if (!_showSearchPanel)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 16),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildChip(
+                              '🕐 Soonest',
+                              _sortBy == 'time',
+                              () => setState(() => _sortBy = 'time'),
+                            ),
+                            _buildChip(
+                              '💰 Cheapest',
+                              _sortBy == 'price',
+                              () => setState(() => _sortBy = 'price'),
+                            ),
+                            _buildChip(
+                              '⭐ Top Rated',
+                              _sortBy == 'rating',
+                              () => setState(() => _sortBy = 'rating'),
+                            ),
+                            _buildChip(
+                              '🚗 Car',
+                              _vehicleType == 'car',
+                              () => setState(
+                                () => _vehicleType = _vehicleType == 'car'
+                                    ? 'all'
+                                    : 'car',
+                              ),
+                            ),
+                            _buildChip(
+                              '🏍 Bike',
+                              _vehicleType == 'bike',
+                              () => setState(
+                                () => _vehicleType = _vehicleType == 'bike'
+                                    ? 'all'
+                                    : 'bike',
+                              ),
+                            ),
+                            _buildChip(
+                              '❄️ AC',
+                              _acFilter == 'yes',
+                              () => setState(
+                                () => _acFilter = _acFilter == 'yes'
+                                    ? 'all'
+                                    : 'yes',
                               ),
                             ),
                           ],
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Route
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_rounded,
-                      size: 14,
-                      color: Color(0xFF4CAF50),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${origins[index]} → ${destinations[index]}',
-                        style: const TextStyle(
-                          color: lightText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+
+                  // ── RESULTS ──
+                  if (_filteredRides.isEmpty)
+                    _buildEmptyState()
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: _filteredRides.map((ride) {
+                          // return RideCard(ride: ride);
+                          return const Card(
+                            child: ListTile(title: Text('Ride Placeholder')),
+                          );
+                        }).toList(),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
 
-                // Time and rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          size: 14,
-                          color: primaryColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          times[index],
-                          style: const TextStyle(
-                            color: darkText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: Color(0xFFFFA500),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${ratings[index]}',
-                          style: const TextStyle(
-                            color: darkText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      // bottomNavigationBar: BookingModal(...) // Implement this logic using a bottom sheet or modal
+    );
+  }
+
+  // --- Widget Builders ---
+
+  Widget _buildFilterButton() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showSearchPanel = !_showSearchPanel;
+              _showAdvanced = false;
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _showSearchPanel ? Colors.blue[600] : Colors.white,
+              border: Border.all(
+                color: _showSearchPanel ? Colors.blue[600]! : Colors.grey[200]!,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.tune,
+                  size: 14,
+                  color: _showSearchPanel ? Colors.white : Colors.grey[600],
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Filters',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _showSearchPanel ? Colors.white : Colors.grey[600],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-
-          // Price
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Rs. ${prices[index]}',
+        ),
+        if (_activeFilterCount > 0)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$_activeFilterCount',
                 style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: primaryColor,
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSafetyBanner({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required Color borderColor,
+    required Widget content,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: content),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchPanel() {
+    return Container(
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // From Input
+            _buildTextField(
+              controller: _originController,
+              hint: 'From — origin or checkpoint',
+              prefixIcon: _buildDotIndicator(Colors.green),
+            ),
+            const SizedBox(height: 12),
+
+            // To Input
+            _buildTextField(
+              controller: _destinationController,
+              hint: 'To — destination',
+              prefixIcon: _buildDotIndicator(Colors.red),
+            ),
+            const SizedBox(height: 12),
+
+            // Date Picker Placeholder
+            GestureDetector(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                );
+                if (date != null) setState(() => _searchDate = date);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
                 ),
-                child: const Text(
-                  'Book',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: primaryColor,
-                    fontWeight: FontWeight.w600,
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 14,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _searchDate == null
+                          ? 'Select Date'
+                          : '${_searchDate!.day}/${_searchDate!.month}/${_searchDate!.year}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _searchDate == null
+                            ? Colors.grey[400]
+                            : Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Advanced Toggle
+            TextButton(
+              onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: Colors.grey[600],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Advanced filters ${_activeFilterCount > 0 ? '($_activeFilterCount active)' : ''}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Icon(
+                    _showAdvanced ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+
+            // Advanced Panel
+            if (_showAdvanced)
+              Container(
+                padding: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.grey[100]!)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      controller: _checkpointController,
+                      hint: 'Search by checkpoint name',
+                      prefixIcon: Icon(
+                        Icons.navigation,
+                        size: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildFilterSection(
+                      'Vehicle',
+                      [
+                        {'v': 'all', 'label': 'All'},
+                        {'v': 'car', 'label': '🚗 Car'},
+                        {'v': 'bike', 'label': '🏍 Bike'},
+                        {'v': 'scooter', 'label': '🛵 Scooter'},
+                      ],
+                      _vehicleType,
+                      (v) => setState(() => _vehicleType = v),
+                    ),
+
+                    _buildFilterSection(
+                      'Price',
+                      [
+                        {'v': 'all', 'label': 'Any'},
+                        {'v': 'low', 'label': '≤৳80'},
+                        {'v': 'medium', 'label': '৳80–150'},
+                        {'v': 'high', 'label': '>৳150'},
+                      ],
+                      _priceRange,
+                      (v) => setState(() => _priceRange = v),
+                    ),
+
+                    _buildFilterSection(
+                      'AC',
+                      [
+                        {'v': 'all', 'label': 'Any'},
+                        {'v': 'yes', 'label': '❄️ AC'},
+                        {'v': 'no', 'label': 'No AC'},
+                      ],
+                      _acFilter,
+                      (v) => setState(() => _acFilter = v),
+                    ),
+
+                    _buildFilterSection(
+                      'Sort by',
+                      [
+                        {'v': 'time', 'label': '🕐 Time'},
+                        {'v': 'price', 'label': '💰 Price'},
+                        {'v': 'rating', 'label': '⭐ Rating'},
+                      ],
+                      _sortBy,
+                      (v) => setState(() => _sortBy = v),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (_activeFilterCount > 0) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _clearAll,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: Text(
+                        'Clear All',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: () => setState(() => _showSearchPanel = false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[600],
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Show ${_filteredRides.length} ride${_filteredRides.length != 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection(
+    String title,
+    List<Map<String, String>> options,
+    String currentValue,
+    Function(String) onSelect,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 6),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[500],
               ),
-            ],
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((opt) {
+              return _buildChip(
+                opt['label']!,
+                currentValue == opt['v'],
+                () => onSelect(opt['v']!),
+              );
+            }).toList(),
           ),
         ],
       ),
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar() {
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: _onBottomNavTapped,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      elevation: 12,
-      selectedItemColor: primaryColor,
-      unselectedItemColor: lightText,
-      selectedLabelStyle: const TextStyle(
-        fontWeight: FontWeight.w600,
-        fontSize: 12,
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required Widget prefixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey[400]),
+        prefixIcon: prefixIcon,
+        suffixIcon: controller.text.isNotEmpty
+            ? IconButton(
+                icon: Icon(Icons.close, size: 14, color: Colors.grey[400]),
+                onPressed: () => setState(() => controller.clear()),
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.grey[50],
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.blue[200]!, width: 2),
+        ),
       ),
-      unselectedLabelStyle: const TextStyle(
-        fontWeight: FontWeight.w500,
-        fontSize: 12,
-      ),
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.search_rounded),
-          label: 'Search',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.add_circle_outline_rounded),
-          label: 'Post',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.receipt_long_rounded),
-          label: 'Rides',
-        ),
-        BottomNavigationBarItem(
-          icon: Badge(
-            label: Text('2'),
-            backgroundColor: Color(0xFFE84C3D),
-            child: Icon(Icons.notifications_rounded),
+      onChanged: (val) => setState(() {}),
+    );
+  }
+
+  Widget _buildDotIndicator(Color color) {
+    return Container(
+      width: 8,
+      height: 8,
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+
+  Widget _buildChip(String label, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.blue[600] : Colors.white,
+          border: Border.all(
+            color: isActive ? Colors.blue[600]! : Colors.grey[200]!,
           ),
-          label: 'Alerts',
+          borderRadius: BorderRadius.circular(20),
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_rounded),
-          label: 'Profile',
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isActive ? Colors.white : Colors.grey[600],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.search, size: 28, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'No rides found',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Try adjusting your filters or check back later',
+            style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 16),
+          if (_activeFilterCount > 0)
+            ElevatedButton(
+              onPressed: _clearAll,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[600],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Clear Filters',
+                style: TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
